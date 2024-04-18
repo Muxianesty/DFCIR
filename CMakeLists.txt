@@ -55,5 +55,5 @@ add_subdirectory(include)
 add_subdirectory(lib)
 
 ## ----------------------------------------------
-add_executable(TESTTEST test.cpp)
-target_link_libraries(TESTTEST MLIRDFCIR)
+##add_executable(TESTTEST test.cpp)
+##target_link_libraries(TESTTEST MLIRDFCIR)
