@@ -18,17 +18,19 @@ add_mlir_dialect_library(MLIRDFCIR
         PUBLIC
         MLIRIR
         CIRCTFIRRTL
-
-        PRIVATE
         MLIRParser
         MLIRRewrite
         MLIRTransformUtils
         LpSolve::LpSolve
         )
 
+
 target_include_directories(MLIRDFCIR
         PUBLIC
         $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
         $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
+        $<BUILD_INTERFACE:${LLVM_INCLUDE_DIRS}>
+        $<BUILD_INTERFACE:${MLIR_INCLUDE_DIRS}>
+        $<BUILD_INTERFACE:${CIRCT_INCLUDE_DIRS}>
         $<INSTALL_INTERFACE:include>
         )
