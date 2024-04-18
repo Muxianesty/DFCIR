@@ -1,0 +1,10 @@
+.idea
+build
+*.cnf
+*.dot
+*.log
+.cproject
+.project
+.vscode
+CMakeLists.txt.user
+a.out
