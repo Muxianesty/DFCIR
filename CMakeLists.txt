@@ -2,9 +2,6 @@ cmake_minimum_required(VERSION 3.16 FATAL_ERROR)
 project(DFCIR LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 
-## HandleLLVMOptions.cmake: "-fPIC is not supported."
-##set(CMAKE_POSITION_INDEPENDENT_CODE False)
-
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 if(DEFINED CIRCT_BIN_HOME)
@@ -19,6 +16,9 @@ find_package(LpSolve REQUIRED)
 unset(LLVM_DIR)
 unset(MLIR_DIR)
 unset(CIRCT_DIR)
+
+find_package(LLVM REQUIRED CONFIG)
+find_package(MLIR REQUIRED CONFIG)
 find_package(CIRCT REQUIRED CONFIG)
 
 message(STATUS "Using MLIRConfig.cmake in: ${MLIR_CMAKE_DIR}")
@@ -54,6 +54,4 @@ add_definitions(${LLVM_DEFINITIONS})
 add_subdirectory(include)
 add_subdirectory(lib)
 
-## ----------------------------------------------
-##add_executable(TESTTEST test.cpp)
-##target_link_libraries(TESTTEST MLIRDFCIR)
+add_subdirectory(cmake)

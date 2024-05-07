@@ -21,6 +21,8 @@ add_mlir_dialect_library(MLIRDFCIR
         MLIRParser
         MLIRRewrite
         MLIRTransformUtils
+
+        PRIVATE
         LpSolve::LpSolve
         )
 
@@ -34,3 +36,6 @@ target_include_directories(MLIRDFCIR
         $<BUILD_INTERFACE:${CIRCT_INCLUDE_DIRS}>
         $<INSTALL_INTERFACE:include>
         )
+
+add_library(DFCIR::MLIRDFCIR ALIAS MLIRDFCIR)
+

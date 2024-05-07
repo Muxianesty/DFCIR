@@ -1,0 +1,13 @@
+find_package(LLVM REQUIRED CONFIG
+             HINTS "@CIRCT_BIN_HOME@")
+
+find_package(MLIR REQUIRED CONFIG
+             HINTS "@CIRCT_BIN_HOME@")
+
+find_package(CIRCT REQUIRED CONFIG
+             HINTS "@CIRCT_BIN_HOME@")
+
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR})
+find_package(LpSolve REQUIRED)
+
+include(${CMAKE_CURRENT_LIST_DIR}/DFCIRTargets.cmake)
