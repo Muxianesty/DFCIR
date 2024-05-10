@@ -340,6 +340,7 @@ protected:
     return newModule;
   }
 
+  virtual ~SchedulableOpConversionPattern() = default;
 };
 
 class AddOpConversionPattern : public FIRRTLOpConversionPattern<AddOp>,

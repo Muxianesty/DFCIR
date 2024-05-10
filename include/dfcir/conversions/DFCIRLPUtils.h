@@ -78,7 +78,7 @@ public:
 
 template <>
 struct std::hash<mlir::dfcir::utils::lp::LPVariable> {
-  using LpVariable = mlir::dfcir::utils::lp::LPVariable;
+  using LPVariable = mlir::dfcir::utils::lp::LPVariable;
 
   size_t operator()(const LPVariable &var) const noexcept {
     return var.id;
@@ -87,7 +87,7 @@ struct std::hash<mlir::dfcir::utils::lp::LPVariable> {
 
 template <>
 struct std::hash<mlir::dfcir::utils::lp::LPConstraint> {
-  using LpVariable = mlir::dfcir::utils::lp::Constraint;
+  using LPConstraint = mlir::dfcir::utils::lp::LPConstraint;
 
   size_t operator()(const LPConstraint &cons) const noexcept {
     // TODO: Fix in the future.

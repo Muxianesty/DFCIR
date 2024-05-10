@@ -149,6 +149,7 @@ struct std::hash<mlir::dfcir::utils::Node> {
 
 template <>
 struct std::hash<mlir::dfcir::utils::Channel> {
+  using Node = mlir::dfcir::utils::Node;
   using Channel = mlir::dfcir::utils::Channel;
 
   size_t operator()(const Channel &channel) const noexcept {

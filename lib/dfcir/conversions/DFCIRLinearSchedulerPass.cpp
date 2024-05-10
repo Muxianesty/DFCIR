@@ -110,7 +110,7 @@ private:
 
     if (status == Status::Optimal || status == Status::Suboptimal) {
       double *result;
-      int count = problem.getResults(&result);
+      problem.getResults(&result);
       for (const auto &[chan, id]: _bufMap) {
         // lp_solve positions start with 1.
         // TODO: Can we make such a cast?

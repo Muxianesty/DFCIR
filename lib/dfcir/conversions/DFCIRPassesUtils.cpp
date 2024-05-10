@@ -197,7 +197,7 @@ Graph::Graph() {
 
 auto Graph::findNode(const std::pair<Value, Operation *> &connectInfo) {
   bool isArg = connectInfo.first.isa<BlockArgument>();
-  Value &val = connectInfo.first;
+  const Value &val = connectInfo.first;
   return std::find_if(nodes.begin(), nodes.end(),
                       [&](const Node &n) {
                         if (isArg) {
