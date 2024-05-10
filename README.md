@@ -22,6 +22,7 @@ This can be done using the following command:
 ```
 sudo apt install build-essential clang lld g++ gcc liblpsolve55-dev ninja-build make
 ```
+## Prerequisites (CIRCT)
 
 Additionally, one of the CIRCT libraries' releases is required ([releases](https://github.com/llvm/circt/releases)).
 
