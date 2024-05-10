@@ -9,7 +9,6 @@ Currently DFCIR is supposed to be used in conjunction with FIRRTL intermediate r
 The computational logic of a streaming dataflow computer has to be statically scheduling: DFCIR currently has two implementations of scheduling algorithms (Linear Programming-approach and a simple as-soon-as-possible algorithm).
 
 ## Prerequisites
-
 **[!!!]** Current version was tested _**only on Ubuntu 20.04**_ **[!!!]**
 
 In order to build DFCIR a number of dependencies has to be installed:
@@ -23,7 +22,6 @@ This can be done using the following command:
 sudo apt install build-essential clang lld g++ gcc liblpsolve55-dev ninja-build make
 ```
 ## Prerequisites (CIRCT)
-
 Additionally, one of the CIRCT libraries' releases is required ([releases](https://github.com/llvm/circt/releases)).
 
 **[!!!]Currently supported release: 1.72.0, Apr 5 2024 ([link](https://github.com/llvm/circt/releases/tag/firtool-1.72.0))[!!!]**
@@ -53,3 +51,19 @@ cd build
 cmake .. -G Ninja -DCIRCT_BIN_HOME="~/firtool-1.72.0"
 ```
 After this, use `cmake --build .` to build DFCIR.
+
+## Usage of DFCIR
+Currently DFCIR project is concentrated in a single static library - a CMake target, addressed by its alias `DFCIR::MLIRDFCIR`.
+Using CMake `find_package(REQUIRED CONFIG HINTS)`-functionality, this library can be incorporated in other projects (the **full path** after `HINTS` needs to specify the build-directory for DFCIR).
+
+The following code describes a simple `CMakeLists.txt`-file of a project, using DFCIR:
+```cmake
+cmake_minimum_required(VERSION 3.16 FATAL_ERROR)
+project(TESTPROJECT C CXX)
+set(CMAKE_CXX_STANDARD 17)
+
+find_package(DFCIR REQUIRED CONFIG HINTS "~/DFCXX/build")
+
+add_executable(TEST test.cpp)
+target_link_libraries(TEST DFCIR::MLIRDFCIR)
+```
