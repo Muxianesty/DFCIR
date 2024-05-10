@@ -62,7 +62,7 @@ cmake_minimum_required(VERSION 3.16 FATAL_ERROR)
 project(TESTPROJECT C CXX)
 set(CMAKE_CXX_STANDARD 17)
 
-find_package(DFCIR REQUIRED CONFIG HINTS "~/DFCXX/build")
+find_package(DFCIR REQUIRED CONFIG HINTS "~/DFCIR/build")
 
 add_executable(TEST test.cpp)
 target_link_libraries(TEST DFCIR::MLIRDFCIR)
