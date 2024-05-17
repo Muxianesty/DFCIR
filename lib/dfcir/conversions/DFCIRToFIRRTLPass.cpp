@@ -286,18 +286,19 @@ public:
     using circt::firrtl::IntType;
     auto castedInt = llvm::dyn_cast<mlir::IntegerAttr>(constOp.getValue());
     auto castedFloat = llvm::dyn_cast<mlir::FloatAttr>(constOp.getValue());
+    Type newType = getTypeConverter()->convertType(constOp.getRes().getType());
+    circt::firrtl::ConstantOp newOp;
+
     if (castedInt) {
-      Type newType = getTypeConverter()->convertType(
-              constOp.getRes().getType());
-      auto newOp = rewriter.create<ConstantOp>(rewriter.getUnknownLoc(),
-                                               newType, castedInt);
-      for (auto &operand: llvm::make_early_inc_range(
-              constOp->getResult(0).getUses())) {
-        operand.set(newOp.getResult());
-      }
+      newOp = rewriter.create<ConstantOp>(rewriter.getUnknownLoc(),
+                                          newType, castedInt);
     } else if (castedFloat) {
       // TODO: Add float functionality.
       assert(false && "No floats yet");
+    }
+    for (auto &operand: llvm::make_early_inc_range(
+            constOp->getResult(0).getUses())) {
+      operand.set(newOp.getResult());
     }
     rewriter.eraseOp(constOp);
     return mlir::success();
@@ -357,20 +358,20 @@ public:
   constructModuleName(const AddOp &op, OpAdaptor &adaptor) const override {
     Type type = op->getResult(0).getType();
     Type convType = getTypeConverter()->convertType(type);
-
+    Type innerType = llvm::cast<DFType>(type).getDFType();
     bool isFloat;
 
     std::string name = ADD_MODULE"_";
     llvm::raw_string_ostream nameStream(name);
 
-    if ((isFloat = type.isa<DFCIRFloatType>())) {
+    if ((isFloat = innerType.isa<DFCIRFloatType>())) {
       nameStream << FLOAT_SPEC"_";
     } else if (convType.isa<IntType>()) {
       nameStream << INT_SPEC"_";
     }
     unsigned latency;
     if (isFloat) {
-      DFCIRFloatType casted = llvm::cast<DFCIRFloatType>(type);
+      DFCIRFloatType casted = llvm::cast<DFCIRFloatType>(innerType);
       nameStream << (casted.getExponentBits() + casted.getFractionBits()) << "#"
                  << casted.getExponentBits();
       latency = latencyConfig->find(ADD_FLOAT)->second;
@@ -421,7 +422,7 @@ public:
     assert(*outTypeWidth == *firstTypeWidth &&
            *outTypeWidth == *secondTypeWidth);
 
-    bool isFloat = type.isa<DFCIRFloatType>();
+    bool isFloat = llvm::cast<DFType>(type).getDFType().isa<DFCIRFloatType>();
     unsigned latency = latencyConfig->find(
             (isFloat) ? ADD_FLOAT : ADD_INT)->second;
     auto module = rewriter.create<FExtModuleOp>(
@@ -506,13 +507,14 @@ public:
   constructModuleName(const MulOp &op, OpAdaptor &adaptor) const override {
     Type type = op->getResult(0).getType();
     Type convType = getTypeConverter()->convertType(type);
+    Type innerType = llvm::cast<DFType>(type).getDFType();
 
     bool isFloat;
 
     std::string name = MUL_MODULE"_";
     llvm::raw_string_ostream nameStream(name);
 
-    if ((isFloat = type.isa<DFCIRFloatType>())) {
+    if ((isFloat = innerType.isa<DFCIRFloatType>())) {
       nameStream << FLOAT_SPEC"_";
     } else if (convType.isa<IntType>()) {
       nameStream << INT_SPEC"_";
@@ -520,7 +522,7 @@ public:
 
     unsigned latency;
     if (isFloat) {
-      DFCIRFloatType casted = llvm::cast<DFCIRFloatType>(type);
+      DFCIRFloatType casted = llvm::cast<DFCIRFloatType>(innerType);
       nameStream << (casted.getExponentBits() + casted.getFractionBits()) << "#"
                  << casted.getExponentBits();
       latency = latencyConfig->find(MUL_FLOAT)->second;
@@ -572,7 +574,7 @@ public:
     assert(*outTypeWidth == *firstTypeWidth &&
            *outTypeWidth == *secondTypeWidth);
 
-    bool isFloat = type.isa<DFCIRFloatType>();
+    bool isFloat = llvm::cast<DFType>(type).getDFType().isa<DFCIRFloatType>();
     unsigned latency = latencyConfig->find(
             (isFloat) ? MUL_FLOAT : MUL_INT)->second;
     auto module = rewriter.create<FExtModuleOp>(
