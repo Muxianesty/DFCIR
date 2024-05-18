@@ -436,8 +436,8 @@ mlir::dfcir::MuxOp::parse(OpAsmParser &parser, OperationState &result) {
       parser.parseColon() ||
       parser.parseType(controlType) || parser.parseComma() ||
       parser.parseOperandList(vars) ||
-      parser.parseColon() || parser.parseType(varType) ||
-      parser.parseRParen() ||
+      parser.parseRParen() || parser.parseColon() ||
+      parser.parseType(varType) ||
       parser.parseOptionalAttrDict(result.attributes))
     return failure();
 
@@ -452,7 +452,7 @@ mlir::dfcir::MuxOp::parse(OpAsmParser &parser, OperationState &result) {
 void mlir::dfcir::MuxOp::print(OpAsmPrinter &p) {
   p << "(" << getControl() << ": " << getControl().getType() << ", ";
   p.printOperands(getVars());
-  p << ": " << getType() << ") ";
+  p << ") : " << getType();
   p.printOptionalAttrDict((*this)->getAttrs());
 }
 
@@ -501,6 +501,74 @@ void mlir::dfcir::ConstantOp::print(::mlir::OpAsmPrinter &_odsPrinter) {
   ::llvm::SmallVector<::llvm::StringRef, 2> elidedAttrs;
   elidedAttrs.push_back("value");
   _odsPrinter.printOptionalAttrDict((*this)->getAttrs(), elidedAttrs);
+}
+
+::mlir::ParseResult mlir::dfcir::OffsetOp::parse(::mlir::OpAsmParser &parser,
+                                                 ::mlir::OperationState &result)
+                                                 {
+  ::mlir::OpAsmParser::UnresolvedOperand strRawOpers[1];
+  ::llvm::ArrayRef<::mlir::OpAsmParser::UnresolvedOperand> strOpers(strRawOpers);
+  ::llvm::SMLoc streamOperandsLoc;
+  (void)streamOperandsLoc;
+  ::mlir::Type streamRawTypes[1];
+  ::llvm::ArrayRef<::mlir::Type> streamTypes(streamRawTypes);
+  ::mlir::IntegerAttr offsetAttr;
+  ::mlir::Type resRawTypes[1];
+  ::llvm::ArrayRef<::mlir::Type> resTypes(resRawTypes);
+  if (parser.parseLParen())
+    return ::mlir::failure();
+
+  streamOperandsLoc = parser.getCurrentLocation();
+  if (parser.parseOperand(strRawOpers[0]) || parser.parseComma() ||
+      parser.parseCustomAttributeWithFallback(offsetAttr, ::mlir::Type{}))
+    return ::mlir::failure();
+
+  if (offsetAttr)
+    result.getOrAddProperties<OffsetOp::Properties>().offset = offsetAttr;
+  if (parser.parseRParen())
+    return ::mlir::failure();
+  {
+    auto loc = parser.getCurrentLocation();(void)loc;
+    if (parser.parseOptionalAttrDict(result.attributes))
+      return ::mlir::failure();
+    if (failed(verifyInherentAttrs(result.name, result.attributes, [&]() {
+      return parser.emitError(loc) << "'" <<
+             result.name.getStringRef() << "' op ";
+    })))
+      return ::mlir::failure();
+  }
+  if (parser.parseColon())
+    return ::mlir::failure();
+
+  {
+    ::mlir::dfcir::DFCIRStreamType type;
+    if (parser.parseCustomTypeWithFallback(type))
+      return ::mlir::failure();
+    resRawTypes[0] = type;
+    streamRawTypes[0] = type;
+  }
+  result.addTypes(resTypes);
+  if (parser.resolveOperands(strOpers, streamTypes, streamOperandsLoc,
+                             result.operands))
+    return ::mlir::failure();
+  return ::mlir::success();
+}
+
+void mlir::dfcir::OffsetOp::print(::mlir::OpAsmPrinter &_odsPrinter) {
+  _odsPrinter << "(" << getStream() << ", ";
+  _odsPrinter.printStrippedAttrOrType(getOffsetAttr());
+  _odsPrinter << ")";
+  ::llvm::SmallVector<::llvm::StringRef, 2> elidedAttrs;
+  elidedAttrs.push_back("offset");
+  _odsPrinter.printOptionalAttrDict((*this)->getAttrs(), elidedAttrs);
+  _odsPrinter << " : ";
+  {
+    auto type = getRes().getType();
+    if (auto validType = ::llvm::dyn_cast<::mlir::dfcir::DFCIRStreamType>(type))
+      _odsPrinter.printStrippedAttrOrType(validType);
+    else
+      _odsPrinter << type;
+  }
 }
 
 #define GET_OP_CLASSES

@@ -55,7 +55,7 @@ def Stream : DFCIR_DialectType<"DFCIRStream", "stream", [DeclareTypeInterfaceMet
 	let parameters = (ins "Type":$streamType);
   let assemblyFormat = "`<` qualified($streamType) `>`";
   let extraClassDeclaration = [{
-      mlir::Type getDFType();
+    mlir::Type getDFType();
   }];
 }
 
@@ -71,7 +71,7 @@ def Const : DFCIR_DialectType<"DFCIRConstant", "const", [DeclareTypeInterfaceMet
   let parameters = (ins "Type":$constType);
   let assemblyFormat = "`<` qualified($constType) `>`";
   let extraClassDeclaration = [{
-      mlir::Type getDFType();
+    mlir::Type getDFType();
   }];
 }
 
