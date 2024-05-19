@@ -13,8 +13,18 @@
 
 #define ADD_MODULE "__ADD"
 #define SUB_MODULE "__SUB"
-#define DIV_MODULE "__DIV"
 #define MUL_MODULE "__MUL"
+#define DIV_MODULE "__DIV"
+#define AND_MODULE "__AND"
+#define OR_MODULE "__OR"
+#define NOT_MODULE "__NOT"
+#define LESS_MODULE "__LESS"
+#define LESS_EQ_MODULE "__LESS_EQ"
+#define MORE_MODULE "__MORE"
+#define MORE_EQ_MODULE "__MORE_EQ"
+#define EQ_MODULE "__EQ"
+#define NEQ_MODULE "__NEQ"
+
 
 #define FLOAT_SPEC "FLOAT"
 #define INT_SPEC "INT"

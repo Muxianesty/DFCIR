@@ -12,8 +12,30 @@ enum Ops {
   UNDEFINED,
   ADD_INT,
   ADD_FLOAT,
+  SUB_INT,
+  SUB_FLOAT,
   MUL_INT,
-  MUL_FLOAT
+  MUL_FLOAT,
+  DIV_INT,
+  DIV_FLOAT,
+  AND_INT,
+  AND_FLOAT,
+  OR_INT,
+  OR_FLOAT,
+  NOT_INT,
+  NOT_FLOAT,
+  LESS_INT,
+  LESS_FLOAT,
+  LESS_EQ_INT,
+  LESS_EQ_FLOAT,
+  MORE_INT,
+  MORE_FLOAT,
+  MORE_EQ_INT,
+  MORE_EQ_FLOAT,
+  EQ_INT,
+  EQ_FLOAT,
+  NEQ_INT,
+  NEQ_FLOAT
 };
 
 } // namespace mlir::dfcir
