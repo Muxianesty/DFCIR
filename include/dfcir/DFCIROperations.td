@@ -216,7 +216,7 @@ def XorOp : DFCIR_Op<"xor", []> {
 def NotOp : DFCIR_Op<"not", [SameOperandsAndResultType, ]> {
 	let arguments = (ins Variable:$first);
 		
-	let assemblyFormat = "$first attr-dict `:` type($res)";
+	let assemblyFormat = "`(` $first `:` type($first) `)` attr-dict `:` type($res)";
 	
 	let results = (outs Variable:$res);
 }
@@ -224,7 +224,7 @@ def NotOp : DFCIR_Op<"not", [SameOperandsAndResultType, ]> {
 def NegOp : DFCIR_Op<"neg", [SameOperandsAndResultType, ]> {
 	let arguments = (ins Variable:$first);
 	
-	let assemblyFormat = "$first attr-dict `:` type($res)";
+	let assemblyFormat = "`(` $first `:` type($first) `)` attr-dict `:` type($res)";
 	
 	let results = (outs Variable:$res);
 }

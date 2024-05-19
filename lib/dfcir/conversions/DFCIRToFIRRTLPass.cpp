@@ -305,22 +305,41 @@ public:
   }
 };
 
-SmallVector<circt::firrtl::PortInfo> getBinaryOpPorts(mlir::Type out,
-                                                      mlir::Type first,
-                                                      mlir::Type second,
+SmallVector<circt::firrtl::PortInfo> getBinaryOpPorts(mlir::Type outType,
+                                                      mlir::Type firstType,
+                                                      mlir::Type secondType,
                                                       mlir::MLIRContext *ctx) {
   return SmallVector<circt::firrtl::PortInfo>  {
           circt::firrtl::PortInfo(
                   mlir::StringAttr::get(ctx, "out"),
-                  out,
+                  outType,
                   circt::firrtl::Direction::Out),
           circt::firrtl::PortInfo(
                   mlir::StringAttr::get(ctx, "first"),
-                  first,
+                  firstType,
                   circt::firrtl::Direction::In),
           circt::firrtl::PortInfo(
                   mlir::StringAttr::get(ctx, "second"),
-                  second,
+                  secondType,
+                  circt::firrtl::Direction::In),
+          circt::firrtl::PortInfo(
+                  mlir::StringAttr::get(ctx, "clk"),
+                  circt::firrtl::ClockType::get(ctx),
+                  circt::firrtl::Direction::In)
+  };
+}
+
+SmallVector<circt::firrtl::PortInfo> getUnaryOpPorts(mlir::Type outType,
+                                                     mlir::Type firstType,
+                                                     mlir::MLIRContext *ctx) {
+  return SmallVector<circt::firrtl::PortInfo>  {
+          circt::firrtl::PortInfo(
+                  mlir::StringAttr::get(ctx, "out"),
+                  outType,
+                  circt::firrtl::Direction::Out),
+          circt::firrtl::PortInfo(
+                  mlir::StringAttr::get(ctx, "operand"),
+                  firstType,
                   circt::firrtl::Direction::In),
           circt::firrtl::PortInfo(
                   mlir::StringAttr::get(ctx, "clk"),
@@ -332,7 +351,7 @@ SmallVector<circt::firrtl::PortInfo> getBinaryOpPorts(mlir::Type out,
 #define CAT(FIRST, SECOND) FIRST ## SECOND
 #define CAT_E(FIRST, SECOND) CAT(FIRST, SECOND)
 
-#define GET_BINARY_OP_NAME(OP_NAME)                                          \
+#define GET_SCHED_OP_NAME(OP_NAME)                                           \
 Type type = op->getResult(0).getType();                                      \
 Type convType = getTypeConverter()->convertType(type);                       \
 Type innerType = llvm::cast<DFType>(type).getDFType();                       \
@@ -423,7 +442,7 @@ protected:
 #define OP_CLASS_CONV_PATTERN(CLASS_PREF) CAT_E(OP_CLASS(CLASS_PREF),ConversionPattern)
 #define SCHED_OP_CONV_PATTERN_SPEC(CLASS_PREF) OP_CLASS(CLASS_PREF) , OP_CLASS_ADAPTOR(CLASS_PREF)
 
-#define DECL_SCHEDULABLE_OP_CONV_PATTERN(CLASS_PREF, OP_NAME)                                       \
+#define DECL_SCHED_BINARY_ARITH_OP_CONV_PATTERN(CLASS_PREF, OP_NAME)                                \
 class OP_CLASS_CONV_PATTERN(CLASS_PREF) : public FIRRTLOpConversionPattern< OP_CLASS(CLASS_PREF) >, \
            SchedulableOpConversionPattern< SCHED_OP_CONV_PATTERN_SPEC(CLASS_PREF) > {               \
 public:                                                                                             \
@@ -435,7 +454,7 @@ public:                                                                         
                                                                                                     \
   std::string                                                                                       \
   constructModuleName(const OP_CLASS(CLASS_PREF) &op, OpAdaptor &adaptor) const override {          \
-    GET_BINARY_OP_NAME(OP_NAME)                                                                     \
+    GET_SCHED_OP_NAME(OP_NAME)                                                                      \
   }                                                                                                 \
                                                                                                     \
   FExtModuleOp                                                                                      \
@@ -516,18 +535,108 @@ public:                                                                         
   }                                                                                                 \
 };                                                                                                  \
 
-DECL_SCHEDULABLE_OP_CONV_PATTERN(Add,ADD) // AddOpConversionPattern.
+DECL_SCHED_BINARY_ARITH_OP_CONV_PATTERN(Add, ADD) // AddOpConversionPattern.
 
-DECL_SCHEDULABLE_OP_CONV_PATTERN(Sub,SUB) // SubOpConversionPattern.
+DECL_SCHED_BINARY_ARITH_OP_CONV_PATTERN(Sub, SUB) // SubOpConversionPattern.
 
-DECL_SCHEDULABLE_OP_CONV_PATTERN(Mul,MUL) // MulOpConversionPattern.
+DECL_SCHED_BINARY_ARITH_OP_CONV_PATTERN(Mul, MUL) // MulOpConversionPattern.
 
-DECL_SCHEDULABLE_OP_CONV_PATTERN(Div,DIV) // DivOpConversionPattern.
+DECL_SCHED_BINARY_ARITH_OP_CONV_PATTERN(Div, DIV) // DivOpConversionPattern.
 
-DECL_SCHEDULABLE_OP_CONV_PATTERN(And,AND) // AndOpConversionPattern.
+DECL_SCHED_BINARY_ARITH_OP_CONV_PATTERN(And, AND) // AndOpConversionPattern.
 
-DECL_SCHEDULABLE_OP_CONV_PATTERN(Or,OR)   // OrOpConversionPattern.
+DECL_SCHED_BINARY_ARITH_OP_CONV_PATTERN(Or, OR)   // OrOpConversionPattern.
 
+DECL_SCHED_BINARY_ARITH_OP_CONV_PATTERN(Xor, XOR)   // OrOpConversionPattern.
+
+#define DECL_SCHED_UNARY_ARITH_OP_CONV_PATTERN(CLASS_PREF, OP_NAME)                                 \
+class OP_CLASS_CONV_PATTERN(CLASS_PREF) : public FIRRTLOpConversionPattern< OP_CLASS(CLASS_PREF) >, \
+           SchedulableOpConversionPattern< SCHED_OP_CONV_PATTERN_SPEC(CLASS_PREF) > {               \
+public:                                                                                             \
+  using FIRRTLOpConversionPattern<OP_CLASS(CLASS_PREF)>::FIRRTLOpConversionPattern;                 \
+  using OpAdaptor = typename OP_CLASS_ADAPTOR(CLASS_PREF);                                          \
+  using FExtModuleOp = circt::firrtl::FExtModuleOp;                                                 \
+  using InstanceOp = circt::firrtl::InstanceOp;                                                     \
+  using IntType = circt::firrtl::IntType;                                                           \
+                                                                                                    \
+  std::string                                                                                       \
+  constructModuleName(const OP_CLASS(CLASS_PREF) &op, OpAdaptor &adaptor) const override {          \
+    GET_SCHED_OP_NAME(OP_NAME)                                                                      \
+  }                                                                                                 \
+                                                                                                    \
+  FExtModuleOp                                                                                      \
+  createModule(const std::string &name, const OP_CLASS(CLASS_PREF) &op, OpAdaptor &adaptor,         \
+               ConversionPatternRewriter &rewriter) const override {                                \
+    Type type = op->getResult(0).getType();                                                         \
+    Type converted = getTypeConverter()->convertType(type);                                         \
+    auto ports = getUnaryOpPorts(converted, adaptor.getFirst().getType(),                           \
+                                 rewriter.getContext());                                            \
+    IntegerType attrType = mlir::IntegerType::get(rewriter.getContext(), 32,                        \
+                                                  mlir::IntegerType::Unsigned);                     \
+    auto outTypeWidth = circt::firrtl::getBitWidth(                                                 \
+            llvm::dyn_cast<circt::firrtl::FIRRTLBaseType>(converted));                              \
+    assert(outTypeWidth.has_value());                                                               \
+    auto firstTypeWidth = circt::firrtl::getBitWidth(                                               \
+            llvm::dyn_cast<circt::firrtl::FIRRTLBaseType>(                                          \
+                    adaptor.getFirst().getType()));                                                 \
+    assert(firstTypeWidth.has_value());                                                             \
+    assert(*outTypeWidth == *firstTypeWidth);                                                      \
+                                                                                                    \
+    bool isFloat = llvm::cast<DFType>(type).getDFType().isa<DFCIRFloatType>();                      \
+    unsigned latency = latencyConfig->find(                                                         \
+            (isFloat) ? CAT_E(OP_NAME,_FLOAT) : CAT_E(OP_NAME,_INT))->second;                       \
+    auto module = rewriter.create<FExtModuleOp>(                                                    \
+            rewriter.getUnknownLoc(),                                                               \
+            mlir::StringAttr::get(rewriter.getContext(), name),                                     \
+            circt::firrtl::ConventionAttr::get(rewriter.getContext(),                               \
+                                               circt::firrtl::Convention::Internal),                \
+            ports,                                                                                  \
+            StringRef((isFloat ? ( CAT_E(OP_NAME,_MODULE) "_" FLOAT_SPEC)                           \
+                               : ( CAT_E(OP_NAME,_MODULE) "_" INT_SPEC))),                          \
+            mlir::ArrayAttr(),                                                                      \
+            mlir::ArrayAttr::get(rewriter.getContext(),                                             \
+                                 GET_OP_SV_PARAMS(rewriter.getContext(),                            \
+                                                  attrType, latency,                                \
+                                                  *outTypeWidth)                                    \
+            ));                                                                                     \
+    module->setAttr(INSTANCE_LATENCY_ATTR,                                                          \
+                    mlir::IntegerAttr::get(attrType, latency));                                     \
+    return module;                                                                                  \
+  }                                                                                                 \
+                                                                                                    \
+  void remapUses( OP_CLASS(CLASS_PREF) &oldOp, OpAdaptor &adaptor,                                  \
+                 InstanceOp &newOp,                                                                 \
+                 ConversionPatternRewriter &rewriter) const override {                              \
+    using circt::firrtl::utils::createConnect;                                                      \
+    using circt::firrtl::utils::getClockVarFromOpBlock;                                             \
+    createConnect(rewriter, newOp.getResult(1), adaptor.getFirst(),                                 \
+                  (*offsetMap)[std::make_pair(oldOp, 0)]);                                          \
+    createConnect(rewriter, newOp.getResult(2), getClockVarFromOpBlock(newOp));                     \
+                                                                                                    \
+    for (auto &operand: llvm::make_early_inc_range(oldOp.getRes().getUses())) {                     \
+      operand.set(newOp.getResult(0));                                                              \
+    }                                                                                               \
+  }                                                                                                 \
+                                                                                                    \
+                                                                                                    \
+  LogicalResult matchAndRewrite( OP_CLASS(CLASS_PREF) oldOp, OpAdaptor adaptor,                     \
+                                ConversionPatternRewriter &rewriter) const override {               \
+    FExtModuleOp module = findOrCreateModule(oldOp, adaptor, rewriter);                             \
+                                                                                                    \
+    auto newOp = rewriter.create<InstanceOp>(                                                       \
+            oldOp.getLoc(),                                                                         \
+            module,                                                                                 \
+            "placeholder");                                                                         \
+    remapUses(oldOp, adaptor, newOp, rewriter);                                                     \
+    rewriter.eraseOp(oldOp);                                                                        \
+                                                                                                    \
+    return mlir::success();                                                                         \
+  }                                                                                                 \
+};
+
+DECL_SCHED_UNARY_ARITH_OP_CONV_PATTERN(Not, NOT)   // NotOpConversionPattern.
+
+DECL_SCHED_UNARY_ARITH_OP_CONV_PATTERN(Neg, NEG)   // NegOpConversionPattern.
 
 class ConnectOpConversionPattern : public FIRRTLOpConversionPattern<ConnectOp> {
 public:
@@ -643,6 +752,9 @@ public:
             DivOpConversionPattern,
             AndOpConversionPattern,
             OrOpConversionPattern,
+            XorOpConversionPattern,
+            NotOpConversionPattern,
+            NegOpConversionPattern,
             ConnectOpConversionPattern>(
             &getContext(),
             typeConverter,
