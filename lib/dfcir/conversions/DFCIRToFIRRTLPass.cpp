@@ -580,7 +580,7 @@ public:                                                                         
             llvm::dyn_cast<circt::firrtl::FIRRTLBaseType>(                                          \
                     adaptor.getFirst().getType()));                                                 \
     assert(firstTypeWidth.has_value());                                                             \
-    assert(*outTypeWidth == *firstTypeWidth);                                                      \
+    assert(*outTypeWidth == *firstTypeWidth);                                                       \
                                                                                                     \
     bool isFloat = llvm::cast<DFType>(type).getDFType().isa<DFCIRFloatType>();                      \
     unsigned latency = latencyConfig->find(                                                         \
@@ -637,6 +637,18 @@ public:                                                                         
 DECL_SCHED_UNARY_ARITH_OP_CONV_PATTERN(Not, NOT)   // NotOpConversionPattern.
 
 DECL_SCHED_UNARY_ARITH_OP_CONV_PATTERN(Neg, NEG)   // NegOpConversionPattern.
+
+DECL_SCHED_BINARY_ARITH_OP_CONV_PATTERN(Less, LESS) // LessOpConversionPattern.
+
+DECL_SCHED_BINARY_ARITH_OP_CONV_PATTERN(LessEq, LESS_EQ) // LessEqOpConversionPattern.
+
+DECL_SCHED_BINARY_ARITH_OP_CONV_PATTERN(More, MORE) // MoreOpConversionPattern.
+
+DECL_SCHED_BINARY_ARITH_OP_CONV_PATTERN(MoreEq, MORE_EQ) // MoreEqOpConversionPattern.
+
+DECL_SCHED_BINARY_ARITH_OP_CONV_PATTERN(Eq, EQ) // EqOpConversionPattern.
+
+DECL_SCHED_BINARY_ARITH_OP_CONV_PATTERN(NotEq, NEQ) // NotEqOpConversionPattern.
 
 class ConnectOpConversionPattern : public FIRRTLOpConversionPattern<ConnectOp> {
 public:
@@ -755,6 +767,12 @@ public:
             XorOpConversionPattern,
             NotOpConversionPattern,
             NegOpConversionPattern,
+            LessOpConversionPattern,
+            LessEqOpConversionPattern,
+            MoreOpConversionPattern,
+            MoreEqOpConversionPattern,
+            EqOpConversionPattern,
+            NotEqOpConversionPattern,
             ConnectOpConversionPattern>(
             &getContext(),
             typeConverter,
