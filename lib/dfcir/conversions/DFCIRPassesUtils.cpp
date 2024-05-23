@@ -9,11 +9,11 @@ createBufferModule(OpBuilder &builder, llvm::StringRef name, Type type,
                    Location loc, unsigned stages) {
   SmallVector<circt::firrtl::PortInfo> ports = {
           circt::firrtl::PortInfo(
-                  mlir::StringAttr::get(builder.getContext(), "out"),
+                  mlir::StringAttr::get(builder.getContext(), "res1"),
                   type,
                   circt::firrtl::Direction::Out),
           circt::firrtl::PortInfo(
-                  mlir::StringAttr::get(builder.getContext(), "in"),
+                  mlir::StringAttr::get(builder.getContext(), "arg1"),
                   type,
                   circt::firrtl::Direction::In),
           circt::firrtl::PortInfo(
@@ -21,8 +21,6 @@ createBufferModule(OpBuilder &builder, llvm::StringRef name, Type type,
                   circt::firrtl::ClockType::get(builder.getContext()),
                   circt::firrtl::Direction::In)
   };
-  IntegerType attrType = mlir::IntegerType::get(builder.getContext(), 32,
-                                                mlir::IntegerType::Unsigned);
   auto typeWidth = circt::firrtl::getBitWidth(
           llvm::dyn_cast<FIRRTLBaseType>(type));
   assert(typeWidth.has_value());
@@ -32,26 +30,8 @@ createBufferModule(OpBuilder &builder, llvm::StringRef name, Type type,
           circt::firrtl::ConventionAttr::get(builder.getContext(),
                                              Convention::Internal),
           ports,
-          StringRef(BUF_MODULE),
-          mlir::ArrayAttr(),
-          mlir::ArrayAttr::get(
-                  builder.getContext(),
-                  {
-                          ParamDeclAttr::get(builder.getContext(),
-                                             mlir::StringAttr::get(
-                                                     builder.getContext(),
-                                                     STAGES_PARAM),
-                                             attrType,
-                                             mlir::IntegerAttr::get(attrType,
-                                                                    stages)),
-                          ParamDeclAttr::get(builder.getContext(),
-                                             mlir::StringAttr::get(
-                                                     builder.getContext(),
-                                                     "in_" TYPE_SIZE_PARAM),
-                                             attrType,
-                                             mlir::IntegerAttr::get(attrType,
-                                                                    *typeWidth))
-                  }));
+          StringRef(name),                             // TODO: Change in the future.
+          mlir::ArrayAttr());
 }
 
 inline FExtModuleOp
@@ -59,8 +39,9 @@ createBufferModuleWithTypeName(OpBuilder &builder, Type type, Location loc,
                                unsigned stages) {
   std::string name = BUF_MODULE;
   llvm::raw_string_ostream nameStream(name);
-  type.print(nameStream);
-  nameStream << "##" << stages;
+  auto width = circt::firrtl::getBitWidth(llvm::dyn_cast<circt::firrtl::FIRRTLBaseType>(type));
+  assert(width.has_value());
+  nameStream << "_IN_" << *width << "_OUT_" << *width << "_" << stages;
   return createBufferModule(builder, name, type, loc, stages);
 }
 
@@ -71,8 +52,9 @@ findOrCreateBufferModule(OpBuilder &builder, Type type, Location loc,
   Block *block = circuit.getBodyBlock();
   std::string name = BUF_MODULE;
   llvm::raw_string_ostream nameStream(name);
-  type.print(nameStream);
-  nameStream << "##" << stages;
+  auto width = circt::firrtl::getBitWidth(llvm::dyn_cast<circt::firrtl::FIRRTLBaseType>(type));
+  assert(width.has_value());
+  nameStream << "_IN_" << *width << "_OUT_" << *width << "_" << stages;
 
   for (auto op = block->op_begin<FExtModuleOp>();
        op != block->op_end<FExtModuleOp>(); ++op) {

@@ -97,10 +97,13 @@ public:
   using ConvertedOps = mlir::DenseSet<mlir::Operation *>;
   using OffsetMap = std::unordered_map<
           std::pair<mlir::Operation *, unsigned>, signed>;
+  using OldTypeMap = std::unordered_map<
+          std::pair<mlir::Operation *, unsigned>, mlir::Type>;
 
   mutable ConvertedOps *convertedOps;
   const LatencyConfig *latencyConfig;
   OffsetMap *offsetMap;
+  OldTypeMap *oldTypeMap;   // TODO: Change when replaceAllUsesWith-related pull request for MLIR is approved.
   ModuleArgMap *moduleArgMap;
 
   FIRRTLOpConversionPattern(MLIRContext *context,
@@ -108,11 +111,13 @@ public:
                             ConvertedOps *convertedOps,
                             LatencyConfig *latencyConfig,
                             OffsetMap *offsetMap,
+                            OldTypeMap *oldTypeMap,
                             ModuleArgMap *moduleArgMap)
           : OpConversionPattern<OperationType>(typeConverter, context),
             convertedOps(convertedOps),
             latencyConfig(latencyConfig),
             offsetMap(offsetMap),
+            oldTypeMap(oldTypeMap),
             moduleArgMap(moduleArgMap) {
     // Required to allow root updates, which imply recursive
     // pattern application.
@@ -184,6 +189,9 @@ public:
       BlockArgument arg = fModuleOp.getArgument(index);
       for (auto &operand: llvm::make_early_inc_range(
               ports[index]->getResult(0).getUses())) {
+        (*oldTypeMap)[std::make_pair(operand.getOwner(),
+                                     operand.getOperandNumber())] =
+                                             operand.get().getType();
         operand.set(arg);
       }
     }
@@ -298,6 +306,9 @@ public:
     }
     for (auto &operand: llvm::make_early_inc_range(
             constOp->getResult(0).getUses())) {
+      (*oldTypeMap)[std::make_pair(operand.getOwner(),
+                                   operand.getOperandNumber())] =
+              operand.get().getType();
       operand.set(newOp.getResult());
     }
     rewriter.eraseOp(constOp);
@@ -311,15 +322,15 @@ SmallVector<circt::firrtl::PortInfo> getBinaryOpPorts(mlir::Type outType,
                                                       mlir::MLIRContext *ctx) {
   return SmallVector<circt::firrtl::PortInfo>  {
           circt::firrtl::PortInfo(
-                  mlir::StringAttr::get(ctx, "out"),
+                  mlir::StringAttr::get(ctx, "res1"),
                   outType,
                   circt::firrtl::Direction::Out),
           circt::firrtl::PortInfo(
-                  mlir::StringAttr::get(ctx, "first"),
+                  mlir::StringAttr::get(ctx, "arg1"),
                   firstType,
                   circt::firrtl::Direction::In),
           circt::firrtl::PortInfo(
-                  mlir::StringAttr::get(ctx, "second"),
+                  mlir::StringAttr::get(ctx, "arg2"),
                   secondType,
                   circt::firrtl::Direction::In),
           circt::firrtl::PortInfo(
@@ -334,11 +345,11 @@ SmallVector<circt::firrtl::PortInfo> getUnaryOpPorts(mlir::Type outType,
                                                      mlir::MLIRContext *ctx) {
   return SmallVector<circt::firrtl::PortInfo>  {
           circt::firrtl::PortInfo(
-                  mlir::StringAttr::get(ctx, "out"),
+                  mlir::StringAttr::get(ctx, "res1"),
                   outType,
                   circt::firrtl::Direction::Out),
           circt::firrtl::PortInfo(
-                  mlir::StringAttr::get(ctx, "operand"),
+                  mlir::StringAttr::get(ctx, "arg1"),
                   firstType,
                   circt::firrtl::Direction::In),
           circt::firrtl::PortInfo(
@@ -352,50 +363,48 @@ SmallVector<circt::firrtl::PortInfo> getUnaryOpPorts(mlir::Type outType,
 #define CAT_E(FIRST, SECOND) CAT(FIRST, SECOND)
 
 #define GET_SCHED_OP_NAME(OP_NAME)                                           \
-Type type = op->getResult(0).getType();                                      \
-Type convType = getTypeConverter()->convertType(type);                       \
-Type innerType = llvm::cast<DFType>(type).getDFType();                       \
-bool isFloat;                                                                \
-                                                                             \
-std::string name = CAT_E(OP_NAME,_MODULE) "_";                               \
+std::string name = CAT_E(OP_NAME,_MODULE);                                   \
 llvm::raw_string_ostream nameStream(name);                                   \
                                                                              \
-if ((isFloat = innerType.isa<DFCIRFloatType>())) {                           \
-  nameStream << FLOAT_SPEC"_";                                               \
-} else if (convType.isa<IntType>()) {                                        \
-  nameStream << INT_SPEC"_";                                                 \
+for (unsigned id = 0; id < op->getNumOperands(); ++id) {                     \
+  nameStream << "_IN_";                                                      \
+  Type oldType = (*oldTypeMap)[std::make_pair(op, id)];                      \
+  Type innerType = llvm::cast<DFType>(oldType).getDFType();                  \
+  llvm::cast<SVSynthesisable>(innerType).printSVSignature(nameStream);       \
 }                                                                            \
-unsigned latency;                                                            \
-if (isFloat) {                                                               \
-  DFCIRFloatType casted = llvm::cast<DFCIRFloatType>(innerType);             \
-  nameStream << (casted.getExponentBits() + casted.getFractionBits()) << "#" \
-             << casted.getExponentBits();                                    \
-  latency = latencyConfig->find(ADD_FLOAT)->second;                          \
-} else {                                                                     \
-  nameStream << llvm::cast<IntType>(convType).getWidthOrSentinel() << "_";   \
-  latency = latencyConfig->find(ADD_INT)->second;                            \
+                                                                             \
+for (unsigned id = 0; id < op->getNumResults(); ++id) {                      \
+  nameStream << "_OUT_";                                                     \
+  Type oldType = (*oldTypeMap)[std::make_pair(op, id)];                      \
+  Type innerType = llvm::cast<DFType>(oldType).getDFType();                  \
+  llvm::cast<SVSynthesisable>(innerType).printSVSignature(nameStream);       \
+  bool isFloat = innerType.isa<DFCIRFloatType>();                            \
+  if (isFloat) {                                                             \
+    nameStream << "_" << latencyConfig->find(CAT_E(OP_NAME,_FLOAT))->second; \
+  } else {                                                                   \
+    nameStream << "_" << latencyConfig->find(CAT_E(OP_NAME,_INT))->second;   \
+  }                                                                          \
 }                                                                            \
-nameStream << "##" << latency;                                               \
 return name;
 
 #define GET_OP_SV_PARAMS(CTX, ATTR_TYPE, LATENCY, WIDTH) {      \
-circt::firrtl::ParamDeclAttr::get(                              \
-        CTX,                                                    \
-        mlir::StringAttr::get(                                  \
-        CTX,                                                    \
-        STAGES_PARAM),                                          \
-        ATTR_TYPE,                                              \
-        mlir::IntegerAttr::get(                                 \
-        ATTR_TYPE, LATENCY)),                                   \
-circt::firrtl::ParamDeclAttr::get(                              \
-        CTX,                                                    \
-        mlir::StringAttr::get(                                  \
-        CTX,                                                    \
-        "op_" TYPE_SIZE_PARAM),                                 \
-        ATTR_TYPE,                                              \
-        mlir::IntegerAttr::get(                                 \
-        ATTR_TYPE,                                              \
-        WIDTH))                                                 \
+//circt::firrtl::ParamDeclAttr::get(                              \
+//        CTX,                                                    \
+//        mlir::StringAttr::get(                                  \
+//        CTX,                                                    \
+//        STAGES_PARAM),                                          \
+//        ATTR_TYPE,                                              \
+//        mlir::IntegerAttr::get(                                 \
+//        ATTR_TYPE, LATENCY)),                                   \
+//circt::firrtl::ParamDeclAttr::get(                              \
+//        CTX,                                                    \
+//        mlir::StringAttr::get(                                  \
+//        CTX,                                                    \
+//        "op_" TYPE_SIZE_PARAM),                                 \
+//        ATTR_TYPE,                                              \
+//        mlir::IntegerAttr::get(                                 \
+//        ATTR_TYPE,                                              \
+//        WIDTH))                                                 \
 }
 
 template <typename OperationType, typename AdaptorType>
@@ -461,27 +470,23 @@ public:                                                                         
   createModule(const std::string &name, const OP_CLASS(CLASS_PREF) &op, OpAdaptor &adaptor,         \
                ConversionPatternRewriter &rewriter) const override {                                \
     Type type = op->getResult(0).getType();                                                         \
-    Type converted = getTypeConverter()->convertType(type);                                         \
-    auto ports = getBinaryOpPorts(converted, adaptor.getFirst().getType(),                          \
+    Type innerType = llvm::cast<DFType>(type).getDFType();                                          \
+    Type firstType = (*oldTypeMap)[std::make_pair(op, 0)];                                          \
+    Type firstInnerType = llvm::cast<DFType>(firstType).getDFType();                                \
+    Type secondType = (*oldTypeMap)[std::make_pair(op, 1)];                                         \
+    Type secondInnerType = llvm::cast<DFType>(secondType).getDFType();                              \
+    Type convertedType = getTypeConverter()->convertType(type);                                     \
+    auto ports = getBinaryOpPorts(convertedType, adaptor.getFirst().getType(),                      \
                                   adaptor.getSecond().getType(),                                    \
                                   rewriter.getContext());                                           \
     IntegerType attrType = mlir::IntegerType::get(rewriter.getContext(), 32,                        \
                                                   mlir::IntegerType::Unsigned);                     \
-    auto outTypeWidth = circt::firrtl::getBitWidth(                                                 \
-            llvm::dyn_cast<circt::firrtl::FIRRTLBaseType>(converted));                              \
-    assert(outTypeWidth.has_value());                                                               \
-    auto firstTypeWidth = circt::firrtl::getBitWidth(                                               \
-            llvm::dyn_cast<circt::firrtl::FIRRTLBaseType>(                                          \
-                    adaptor.getFirst().getType()));                                                 \
-    assert(firstTypeWidth.has_value());                                                             \
-    auto secondTypeWidth = circt::firrtl::getBitWidth(                                              \
-            llvm::dyn_cast<circt::firrtl::FIRRTLBaseType>(                                          \
-                    adaptor.getSecond().getType()));                                                \
-    assert(secondTypeWidth.has_value());                                                            \
-    assert(*outTypeWidth == *firstTypeWidth &&                                                      \
-           *outTypeWidth == *secondTypeWidth);                                                      \
+    auto outTypeWidth = llvm::cast<SVSynthesisable>(innerType).getBitWidth();                       \
+    auto firstTypeWidth = llvm::cast<SVSynthesisable>(firstInnerType).getBitWidth();                \
+    auto secondTypeWidth = llvm::cast<SVSynthesisable>(secondInnerType).getBitWidth();              \
+    assert(outTypeWidth == firstTypeWidth && outTypeWidth == secondTypeWidth);                      \
                                                                                                     \
-    bool isFloat = llvm::cast<DFType>(type).getDFType().isa<DFCIRFloatType>();                      \
+    bool isFloat = innerType.isa<DFCIRFloatType>();                                                 \
     unsigned latency = latencyConfig->find(                                                         \
             (isFloat) ? CAT_E(OP_NAME,_FLOAT) : CAT_E(OP_NAME,_INT))->second;                       \
     auto module = rewriter.create<FExtModuleOp>(                                                    \
@@ -490,14 +495,7 @@ public:                                                                         
             circt::firrtl::ConventionAttr::get(rewriter.getContext(),                               \
                                                circt::firrtl::Convention::Internal),                \
             ports,                                                                                  \
-            StringRef((isFloat ? ( CAT_E(OP_NAME,_MODULE) "_" FLOAT_SPEC)                           \
-                               : ( CAT_E(OP_NAME,_MODULE) "_" INT_SPEC))),                          \
-            mlir::ArrayAttr(),                                                                      \
-            mlir::ArrayAttr::get(rewriter.getContext(),                                             \
-                                 GET_OP_SV_PARAMS(rewriter.getContext(),                            \
-                                                  attrType, latency,                                \
-                                                  *outTypeWidth)                                    \
-            ));                                                                                     \
+            StringRef(name));                                                                      \
     module->setAttr(INSTANCE_LATENCY_ATTR,                                                          \
                     mlir::IntegerAttr::get(attrType, latency));                                     \
     return module;                                                                                  \
@@ -515,6 +513,9 @@ public:                                                                         
     createConnect(rewriter, newOp.getResult(3), getClockVarFromOpBlock(newOp));                     \
                                                                                                     \
     for (auto &operand: llvm::make_early_inc_range(oldOp.getRes().getUses())) {                     \
+      (*oldTypeMap)[std::make_pair(operand.getOwner(),                                              \
+                                   operand.getOperandNumber())] =                                   \
+              operand.get().getType();                                                              \
       operand.set(newOp.getResult(0));                                                              \
     }                                                                                               \
   }                                                                                                 \
@@ -568,21 +569,19 @@ public:                                                                         
   createModule(const std::string &name, const OP_CLASS(CLASS_PREF) &op, OpAdaptor &adaptor,         \
                ConversionPatternRewriter &rewriter) const override {                                \
     Type type = op->getResult(0).getType();                                                         \
-    Type converted = getTypeConverter()->convertType(type);                                         \
-    auto ports = getUnaryOpPorts(converted, adaptor.getFirst().getType(),                           \
-                                 rewriter.getContext());                                            \
+    Type innerType = llvm::cast<DFType>(type).getDFType();                                          \
+    Type firstType = (*oldTypeMap)[std::make_pair(op, 0)];                                          \
+    Type firstInnerType = llvm::cast<DFType>(firstType).getDFType();                                \
+    Type convertedType = getTypeConverter()->convertType(type);                                     \
+    auto ports = getUnaryOpPorts(convertedType, adaptor.getFirst().getType(),                       \
+                                  rewriter.getContext());                                           \
     IntegerType attrType = mlir::IntegerType::get(rewriter.getContext(), 32,                        \
                                                   mlir::IntegerType::Unsigned);                     \
-    auto outTypeWidth = circt::firrtl::getBitWidth(                                                 \
-            llvm::dyn_cast<circt::firrtl::FIRRTLBaseType>(converted));                              \
-    assert(outTypeWidth.has_value());                                                               \
-    auto firstTypeWidth = circt::firrtl::getBitWidth(                                               \
-            llvm::dyn_cast<circt::firrtl::FIRRTLBaseType>(                                          \
-                    adaptor.getFirst().getType()));                                                 \
-    assert(firstTypeWidth.has_value());                                                             \
-    assert(*outTypeWidth == *firstTypeWidth);                                                       \
+    auto outTypeWidth = llvm::cast<SVSynthesisable>(innerType).getBitWidth();                       \
+    auto firstTypeWidth = llvm::cast<SVSynthesisable>(firstInnerType).getBitWidth();                \
+    assert(outTypeWidth == firstTypeWidth);                                                         \
                                                                                                     \
-    bool isFloat = llvm::cast<DFType>(type).getDFType().isa<DFCIRFloatType>();                      \
+    bool isFloat = innerType.isa<DFCIRFloatType>();                                                 \
     unsigned latency = latencyConfig->find(                                                         \
             (isFloat) ? CAT_E(OP_NAME,_FLOAT) : CAT_E(OP_NAME,_INT))->second;                       \
     auto module = rewriter.create<FExtModuleOp>(                                                    \
@@ -591,14 +590,7 @@ public:                                                                         
             circt::firrtl::ConventionAttr::get(rewriter.getContext(),                               \
                                                circt::firrtl::Convention::Internal),                \
             ports,                                                                                  \
-            StringRef((isFloat ? ( CAT_E(OP_NAME,_MODULE) "_" FLOAT_SPEC)                           \
-                               : ( CAT_E(OP_NAME,_MODULE) "_" INT_SPEC))),                          \
-            mlir::ArrayAttr(),                                                                      \
-            mlir::ArrayAttr::get(rewriter.getContext(),                                             \
-                                 GET_OP_SV_PARAMS(rewriter.getContext(),                            \
-                                                  attrType, latency,                                \
-                                                  *outTypeWidth)                                    \
-            ));                                                                                     \
+            StringRef(name));                                                                     \
     module->setAttr(INSTANCE_LATENCY_ATTR,                                                          \
                     mlir::IntegerAttr::get(attrType, latency));                                     \
     return module;                                                                                  \
@@ -614,6 +606,9 @@ public:                                                                         
     createConnect(rewriter, newOp.getResult(2), getClockVarFromOpBlock(newOp));                     \
                                                                                                     \
     for (auto &operand: llvm::make_early_inc_range(oldOp.getRes().getUses())) {                     \
+      (*oldTypeMap)[std::make_pair(operand.getOwner(),                                              \
+                                   operand.getOperandNumber())] =                                   \
+              operand.get().getType();                                                              \
       operand.set(newOp.getResult(0));                                                              \
     }                                                                                               \
   }                                                                                                 \
@@ -678,6 +673,9 @@ public:
 
     for (auto &operand: llvm::make_early_inc_range(
             offsetOp.getRes().getUses())) {
+      (*oldTypeMap)[std::make_pair(operand.getOwner(),
+                                   operand.getOperandNumber())] =
+              operand.get().getType();
       operand.set(offsetOp.getOperand());
       (*offsetMap)[std::make_pair(operand.getOwner(),
                                   operand.getOperandNumber())] = offset;
@@ -698,6 +696,9 @@ public:
     auto newOp = rewriter.create<circt::firrtl::MultibitMuxOp>(
             rewriter.getUnknownLoc(), adaptor.getControl(), adaptor.getVars());
     for (auto &operand: llvm::make_early_inc_range(muxOp.getRes().getUses())) {
+      (*oldTypeMap)[std::make_pair(operand.getOwner(),
+                                   operand.getOperandNumber())] =
+              operand.get().getType();
       operand.set(newOp.getResult());
     }
     rewriter.eraseOp(muxOp);
@@ -710,6 +711,7 @@ class DFCIRToFIRRTLPass
 public:
   using ConvertedOps = mlir::DenseSet<mlir::Operation *>;
   using OffsetMap = std::unordered_map<std::pair<mlir::Operation *, unsigned>, signed>;
+  using OldTypeMap = std::unordered_map<std::pair<mlir::Operation *, unsigned>, mlir::Type>;
 
   explicit DFCIRToFIRRTLPass(const DFCIRToFIRRTLPassOptions &options)
           : impl::DFCIRToFIRRTLPassBase<DFCIRToFIRRTLPass>(options) {}
@@ -725,6 +727,8 @@ public:
     FIRRTLTypeConverter typeConverter;
     ConvertedOps convertedOps;
     OffsetMap offsetMap;
+    OldTypeMap oldTypeMap;
+
     ModuleArgMap moduleArgMap;
 
     // Convert the kernel first to get a FIRRTL-circuit.
@@ -736,6 +740,7 @@ public:
             &convertedOps,
             latencyConfig,
             &offsetMap,
+            &oldTypeMap,
             &moduleArgMap
     );
 
@@ -779,6 +784,7 @@ public:
             &convertedOps,
             latencyConfig,
             &offsetMap,
+            &oldTypeMap,
             &moduleArgMap
     );
 

@@ -17,29 +17,53 @@ def DFType : TypeInterface<"DFType"> {
 
 }
 
+def SVSynthesisable : TypeInterface<"SVSynthesisable"> {
+  let cppNamespace = "mlir::dfcir";
+
+  let methods = [
+    InterfaceMethod<"Print type's SystemVerilog signature",
+    "void", "printSVSignature", (ins "llvm::raw_string_ostream &":$out)>,
+    InterfaceMethod<"Get type's  SystemVerilog bit width ",
+    "uint64_t", "getBitWidth", (ins)>
+  ];
+
+}
+
 class DFCIR_DialectType<string typeName, string typeMnemonic, list<Trait> traits = []> 
 	: TypeDef<DFCIR_Dialect, typeName, traits> {
 	let mnemonic = typeMnemonic;
 }
 
-def Fixed : DFCIR_DialectType<"DFCIRFixed", "fixed"> {
+def Fixed : DFCIR_DialectType<"DFCIRFixed", "fixed", [DeclareTypeInterfaceMethods<SVSynthesisable>]> {
 	let parameters = (ins
 		"bool":$sign,
 		"unsigned":$integerBits,
 		"unsigned":$fractionBits);
+  let extraClassDeclaration = [{
+    void printSVSignature(llvm::raw_string_ostream &out);
+    uint64_t getBitWidth();
+  }];
 	let assemblyFormat = "`<` $sign `,` $integerBits `,` $fractionBits `>`";
 }
 
-def Float : DFCIR_DialectType<"DFCIRFloat", "float"> {
+def Float : DFCIR_DialectType<"DFCIRFloat", "float", [DeclareTypeInterfaceMethods<SVSynthesisable>]> {
 	let parameters = (ins
 		"unsigned":$exponentBits,
 		"unsigned":$fractionBits);
+  let extraClassDeclaration = [{
+    void printSVSignature(llvm::raw_string_ostream &out);
+    uint64_t getBitWidth();
+  }];
 	let assemblyFormat = "`<` $exponentBits `,` $fractionBits `>`";
 }
 
-def RawBits : DFCIR_DialectType<"DFCIRRawBits", "rawbits"> {
+def RawBits : DFCIR_DialectType<"DFCIRRawBits", "rawbits", [DeclareTypeInterfaceMethods<SVSynthesisable>]> {
 	let parameters = (ins "unsigned":$bits);
 	let assemblyFormat = "`<` $bits `>`";
+  let extraClassDeclaration = [{
+    void printSVSignature(llvm::raw_string_ostream &out);
+    uint64_t getBitWidth();
+  }];
 }
 
 def Primitive : TypeConstraint<Or<[Fixed.predicate, Float.predicate, RawBits.predicate]>, "primitive">;
